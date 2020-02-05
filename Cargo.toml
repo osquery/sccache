@@ -83,7 +83,7 @@ url = { version = "1.0", optional = true }
 uuid = { version = "0.7", features = ["v4"] }
 walkdir = "1.0.7"
 which = "2"
-zip = { version = "0.4", default-features = false, features = ["deflate"] }
+zip = { version = "0.5", default-features = false, features = ["deflate"] }
 
 # dist-server only
 crossbeam-utils = { version = "0.5", optional = true }

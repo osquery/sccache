@@ -221,7 +221,8 @@ ArgData! {
     Output(PathBuf),
     DepFile(PathBuf),
     ProgramDatabase(PathBuf),
-    DebugInfo,
+    DebugInfoExternal,
+    DebugInfoInternal,
     XClang(OsString),
 }
 
@@ -244,7 +245,8 @@ counted_array!(static ARGS: [ArgInfo<ArgData>; _] = [
     take_arg!("-I", PathBuf, CanBeSeparated, PreprocessorArgumentPath),
     take_arg!("-U", OsString, Concatenated, PreprocessorArgument),
     take_arg!("-Xclang", OsString, Separated, XClang),
-    flag!("-Zi", DebugInfo),
+    flag!("-Z7", DebugInfoInternal),
+    flag!("-Zi", DebugInfoExternal),
     flag!("-c", DoCompilation),
     take_arg!("-deps", PathBuf, Concatenated, DepFile),
     flag!("-fsyntax-only", TooHardFlag),
@@ -265,6 +267,7 @@ pub fn parse_arguments(
     let mut extra_hash_files = vec![];
     let mut compilation = false;
     let mut debug_info = false;
+    let mut debug_internal = false;
     let mut pdb = None;
     let mut depfile = None;
     let mut show_includes = false;
@@ -299,7 +302,14 @@ pub fn parse_arguments(
             }
             Some(DepFile(p)) => depfile = Some(p.clone()),
             Some(ProgramDatabase(p)) => pdb = Some(p.clone()),
-            Some(DebugInfo) => debug_info = true,
+            Some(DebugInfoExternal) => {
+                debug_info = true;
+                debug_internal = false
+            }
+            Some(DebugInfoInternal) => {
+                debug_info = true;
+                debug_internal = true
+            }
             Some(PreprocessorArgument(_)) | Some(PreprocessorArgumentPath(_)) => {}
             Some(XClang(s)) => xclangs.push(s.clone()),
             None => {
@@ -322,10 +332,12 @@ pub fn parse_arguments(
                     arg.normalize(NormalizedDisposition::Concatenated)
                         .iter_os_strings(),
                 ),
-            Some(ProgramDatabase(_)) | Some(DebugInfo) => common_args.extend(
-                arg.normalize(NormalizedDisposition::Concatenated)
-                    .iter_os_strings(),
-            ),
+            Some(ProgramDatabase(_)) | Some(DebugInfoExternal) | Some(DebugInfoInternal) => {
+                common_args.extend(
+                    arg.normalize(NormalizedDisposition::Concatenated)
+                        .iter_os_strings(),
+                )
+            }
             _ => {}
         }
     }
@@ -405,7 +417,7 @@ pub fn parse_arguments(
     }
     // -Fd is not taken into account unless -Zi is given
     // Clang is currently unable to generate PDB files
-    if debug_info && !is_clang {
+    if debug_info && !debug_internal && !is_clang {
         match pdb {
             Some(p) => outputs.insert("pdb", p),
             None => {
